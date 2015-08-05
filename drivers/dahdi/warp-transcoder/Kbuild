@@ -1,0 +1,6 @@
+CFLAGS_MODULE += -I$(INCLUDE) -I$(src) -DWARP_V2
+
+obj-m += warp-tcoder.o
+warp-tcoder-objs := warp-transcoder.o
+
+
