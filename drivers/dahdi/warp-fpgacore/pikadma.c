@@ -613,12 +613,6 @@ int dma_init_module(struct warp_fpga * dma)
 		return -ENOENT;
 	}
 
-	// Testing DMA loopback
-	if (dma_loop_back_test()) {
-		printk(KERN_ERR MODNAME ": Unable to complete the loop-back test with SGL\n");
-		goto error_cleanup;
-	}
-
 	// Take straight from device extension
 	if (create_scatter_gather(dma, ENTRIES, 0)) {
 		printk(KERN_ERR MODNAME ": Unable to allocate SGL\n");
@@ -626,7 +620,7 @@ int dma_init_module(struct warp_fpga * dma)
 	}
 
 	// Disable ALL IRQs ?
-	fpga_write(dma->fpga, FPGA_IMR, 0);
+	//fpga_write(dma->fpga, FPGA_IMR, 0);
 
 	if (request_irq(dma->irq, dma_isr, IRQF_SHARED, "pikadma", dma)) {
 		printk(KERN_ERR MODNAME ": Unable to request irq\n");

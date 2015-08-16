@@ -98,9 +98,9 @@ static int warp_fpga_probe(struct platform_device *pdev)
 	printk(KERN_INFO "pika,fpga resource => %x-%x\n", res.start, res.end);
 
 	// Map FPGA base
-	chip->base = chip->fpga = of_iomap(np, 0);
+	chip->base = chip->fpga = ioremap(res.start, 0x2200);
 	if (chip->fpga == NULL) {
-		dev_err(&pdev->dev, "%s of_iomap FAILED\n", __func__);
+		dev_err(&pdev->dev, "%s ioremap FAILED\n", __func__);
 		goto error_cleanup;
 	}
 
@@ -112,17 +112,10 @@ static int warp_fpga_probe(struct platform_device *pdev)
 	}
 
 	// Done with np
-        of_node_put(np);
+    of_node_put(np);
 
 	// Extract all FPGA-SGL parameters from open firmware
 	np = of_find_compatible_node(NULL, NULL, "pika,fpga-sgl");
-
-	// Check resource
-	if (of_address_to_resource(np, 0, &res)) {
-		dev_err(&pdev->dev, "%s of_address_to_resource FAILED\n", __func__);
-		goto error_cleanup;
-	}
-	printk(KERN_INFO "pika,fpga-sgl resource => %x-%x\n", res.start, res.end);
 
 	// Map FPGA-SGL base
 	chip->sgl = of_iomap(np, 0);
@@ -132,7 +125,7 @@ static int warp_fpga_probe(struct platform_device *pdev)
 	}
 
 	// Done with np
-        of_node_put(np);
+    of_node_put(np);
 
 	// Mutex creation
 	mutex_init(&chip->lock);
@@ -177,14 +170,12 @@ static int warp_fpga_probe(struct platform_device *pdev)
 		goto err_taco;
 	}
 
-	/*
 	if (warpfpgactrl_init() != 0)
 	{
 		dev_err(&pdev->dev, "warpfpgactrl_init FAILED");
 		goto err_taco;
 
 	}
-	*/
 
 	// Only reset the silabs once
 	/*
