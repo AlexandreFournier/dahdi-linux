@@ -2071,22 +2071,13 @@ static int dahdi_warp_get_opermode(void)
 int __init dahdi_warp_init_module(void)
 {
 	PDEVICE_EXTENSION pdx;
-#ifdef WARP_V2
-	struct device_node *np;
-	struct resource res;
-	void __iomem *fpga;
-	int irq;
-#else
 	//WARP_V3
 	struct warp_fpga * dma = NULL;
 	u32 rev;
 	u32 moda_fxs, modb_fxs, moda_fxo, modb_fxo;
-
-#endif
 	char err_str[256];
 	int rc;
 
-#ifndef WARP_V2
 	if ( warp_fpga_isactive() == 0 )
  	{
 	 	printk(KERN_ERR "FPGA is not active\n");
@@ -2106,6 +2097,7 @@ int __init dahdi_warp_init_module(void)
 		return -ENODEV;
 	}
 
+#ifdef CONFIG_POST
         if((moda_fxo) || (modb_fxo))
 		g_dvr_id = POST_FXO_DVR_ID;
         else
@@ -2138,58 +2130,11 @@ int __init dahdi_warp_init_module(void)
 	/* initialize the spinlock for ... */
 	spin_lock_init(&pdx->stat_lock);
 
-#ifdef WARP_V2
-	/* extract all fpga parameters from open firmware */
-	if ((np = of_find_compatible_node(NULL, NULL, "pika,fpga")) == NULL) {
-		printk(KERN_ERR "%s:%s() Unable to find fpga\n",
-			__FILE__, __FUNCTION__);
-		goto error_cleanup;
-	}
-
-	if ((irq = irq_of_parse_and_map(np, 0)) == NO_IRQ) {
-		printk(KERN_ERR "%s:%s() irq_of_parse_and_map failed\n",
-			__FILE__, __FUNCTION__);
-		goto error_cleanup;
-	}
-
-	if (of_address_to_resource(np, 0, &res)) {
-		printk(KERN_ERR "%s:%s() Unable to get FPGA address\n",
-			__FILE__, __FUNCTION__);
-		goto error_cleanup;
-	}
-
-	/* map everything except SD. */
-	if ((fpga = ioremap(res.start, 0x2200)) == NULL) {
-		printk(KERN_ERR "%s:%s() Unable to map FPGA\n",
-			__FILE__, __FUNCTION__);
-		goto error_cleanup;
-	}	
-
-   	of_node_put(np);
-
-        pdx->info.irql = irq;
-        pdx->bar0 = fpga;
-
-#ifdef STANDALONE_ANALOG_DRIVER
-	/* you need a device for DMA or nothing works with 2.6.31 */
-	pdx->dev = platform_device_register_simple("warp-dev", 0, NULL, 0);
-	pdx->dev->dev.coherent_dma_mask = ~0ULL;
-
-	/* initialize the dma library 
-	 * note that this should be done only once per boot 
-	 */
-
-	if ((rc = dma_init_module(pdx))) {
-		goto error_cleanup;
-	}
-#endif //STANDALONE_ANALOG_DRIVER
-
-#else //WARP_V3
 
 	pdx->info.irql = dma->irq;
 	pdx->bar0 = dma->base;
 	pdx->pdev = dma->pdev;
-#endif // WARP_V2
+
 	/* initialize the locks */
 	spin_lock_init(&pdx->ringgen_lock);
 	spin_lock_init(&pdx->event_lock);
@@ -2247,15 +2192,6 @@ int __init dahdi_warp_init_module(void)
 	return 0;
 
 error_cleanup:
-
-#ifdef WARP_V2
-	if (pdx->bar0)
-		iounmap(pdx->bar0);
-
-
-	if (np)
-		of_node_put(np);
-#endif
 
 	kfree(pdx);
 	return -ENOENT;
