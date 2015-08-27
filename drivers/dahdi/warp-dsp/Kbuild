@@ -1,9 +1,5 @@
-obj-m += warpdsp.o
-
-warpdsp-objs := warp-dsp.o
-
 EXTRA_CFLAGS += -I3rdparty/ -D__COMPILER_VERSION__=500 -DLINUX -DDSP_TYPE=55 -DWARP_V2
 
-#3rd Party source files 
-warpdsp-objs += 3rdparty/GpakApi.o 3rdparty/GpakCust.o
+obj-m += warp-dsp.o
+warp-dsp-objs := warp_dsp.o 3rdparty/GpakApi.o 3rdparty/GpakCust.o
 
