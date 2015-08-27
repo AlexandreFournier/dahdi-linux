@@ -30,11 +30,7 @@ void warp_dma_fini(PDEVICE_EXTENSION pdx)
 }
 
 /* dma enable control function -- TODO : call the function directly */
-#ifdef WARP_V2
-int warp_dma_enable(void (*dma_handler)(int))
-#else
 int warp_dma_enable(void (*dma_handler)(int,void * arg))
-#endif
 {
 	return warp_dma_register(dma_handler);
 }

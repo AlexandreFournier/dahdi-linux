@@ -16,13 +16,9 @@
 //int pikadma_unregister(int cardid);
 
 /* register our dma handler function */
-int warp_dma_register(void (*cb)(int cardid))
+int warp_dma_register(void (*cb)(int cardid, void *arg))
 {
-#ifdef WARP_V2
-	return pikadma_register_cb(DAHDI_FXSO_CARD_ID, cb);
-#else
 	return pikadma_register_cb(DAHDI_FXSO_CARD_ID, cb, NULL);
-#endif
 }
 
 /* unregister a given dma handler */

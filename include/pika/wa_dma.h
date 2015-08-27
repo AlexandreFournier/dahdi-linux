@@ -37,7 +37,7 @@ struct dma_inst {
 //int warp_dma_register(dma_isr_func dma_func);
 //int warp_dma_unregister(dma_isr_func dma_func);
 
-int warp_dma_register(void (*cb)(int cardid));
+int warp_dma_register(void (*cb)(int cardid, void *arg));
 int warp_dma_unregister(void);
 
 /* helper functions */

@@ -30,9 +30,6 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/moduleparam.h>
-#ifdef WARP_V2
-#include <linux/of_platform.h>
-#endif
 #ifdef CONFIG_POST
 #include <linux/post.h>
 #else
@@ -308,7 +305,6 @@ static int dahdi_warp_analog_open(struct dahdi_chan *chan)
 	//printk("chan_mask %08x - chan_pos: %d\n", wa->chan_mask, chan->chanpos);
 	if (!(wa->chan_mask & (1 << (chan_index)))) {
 		printk("error dahdi_warp_analog_open %d chan_mask %08x\n", chan_index, wa->chan_mask);
-	//if (!(wa->chan_mask & (1 << (chan->chanpos)))) {
 		return -ENODEV;
 	}
 
@@ -1080,8 +1076,8 @@ static int dahdi_warp_analog_initialize_fxs(struct warp_analog *warpalg,
 #endif
 
 	/* add the rest if there are modules */
-	for (ii = 0; ii < warpalg->num_chans; ii++) {
 #ifdef FPGA_6052
+	for (ii = 0; ii < warpalg->num_chans; ii++) {
 		/* As of FPGA version 6052+ the new ts slot start at 0 for module A
 		 * and Module B starts at 32 */
 		if ( ts < 4 &&  (warpalg->module_port & MODULE_PORT_A) )
@@ -1092,10 +1088,14 @@ static int dahdi_warp_analog_initialize_fxs(struct warp_analog *warpalg,
 		}
 		printk("FXS Timeslot %d: %d\n", ii,warpalg->chan_timeslot[ii]);
 		ts++;
-#else
-		warpalg->chan_timeslot[ii] = ((ts++) << 1);
-#endif
 	}
+#else
+    if( first_timeslot > 0 ) {
+	    for (ii = 1; ii < warpalg->num_chans; ii++) {
+	    	warpalg->chan_timeslot[ii] = ((ts++) << 1);
+        }
+	}
+#endif
 
 	sprintf(warpalg->span.name, "FXS/%d", warpalg->pos);
 	snprintf(warpalg->span.desc, sizeof(warpalg->span.desc) - 1,
@@ -1115,13 +1115,13 @@ static int dahdi_warp_analog_initialize_fxs(struct warp_analog *warpalg,
 					DAHDI_SIG_EM | \
 					DAHDI_SIG_CLEAR;
 		warpalg->chans[ii]->pvt = warpalg;
-		//if (ii > 0) {
-		warpalg->chans[ii]->chanpos = first_timeslot + ii + 1;
-		//printk("ii: %d - chanpos: %d (0x%x), \n", ii, warpalg->chans[ii]->chanpos,warpalg->chans[ii]->chanpos);
-		//} else {				
+		if (ii > 0) {
+		    warpalg->chans[ii]->chanpos = first_timeslot + ii;
+		    //printk("ii: %d - chanpos: %d (0x%x), \n", ii, warpalg->chans[ii]->chanpos,warpalg->chans[ii]->chanpos);
+		} else {
 			/* 1st channel is always the on board FXS */
-		//	warpalg->chans[0]->chanpos = 2;
-		//}
+			warpalg->chans[0]->chanpos = 2;
+		}
 
 		/* do not reverse polarity */
 		warpalg->fxs_reversepolarity[ii] = 0;
@@ -1275,6 +1275,11 @@ int dahdi_warp_analog_warp_to_span_chan_num(int *span_chan_num,
 #ifdef FPGA_6052
 	case 0 ... 3:
 #else
+    case 1:         /* onboard module */
+        /* On Board FXS is always the first FXS port */
+        *span_chan_num = 0;
+        break;
+
 	case 2 ... 5:	/* module A */
 #endif
 		/* For FXS modules, module channels are always from 1..4, 0 is for the onboard FXS */
@@ -1283,7 +1288,11 @@ int dahdi_warp_analog_warp_to_span_chan_num(int *span_chan_num,
 #ifdef FPGA_6052
 			*span_chan_num = warp_chan_num ; // - 2; // V3 -2 , V2 -1
 #else
-			*span_chan_num = warp_chan_num  2; // V3 -2 , V2 -1
+#ifdef WARP_V2
+			*span_chan_num = warp_chan_num - 1;
+#else
+			*span_chan_num = warp_chan_num - 2;
+#endif
 #endif
 		} else if (warpalg->module_type == MODULE_TYPE_FXO) {
 
@@ -1317,9 +1326,17 @@ int dahdi_warp_analog_warp_to_span_chan_num(int *span_chan_num,
 		if (warpalg->module_type == MODULE_TYPE_FXS) {
 			/* check for the case where we have two modules of the same kind (FXS) */
 			if ((dahdi_warp_analog_devcount() == 1) && (warpalg->num_chans > 4)) {
-				*span_chan_num = warp_chan_num - 2; //V3 -2, V2 -1
+#ifdef WARP_V2
+				*span_chan_num = warp_chan_num - 1;
+#else
+				*span_chan_num = warp_chan_num - 2;
+#endif
 			} else {
-				*span_chan_num = warp_chan_num - 6; //V3 -6, V2 -5
+#ifdef WARP_V2
+				*span_chan_num = warp_chan_num - 5; //V3 -6, V2 -5
+#else
+				*span_chan_num = warp_chan_num - 6;
+#endif
 
 
 			}
@@ -1793,6 +1810,7 @@ void do_timers(unsigned long p)
 						(wa->lasttxhook[cc] == LINE_STATE_RV_ONHOOK_TX)) {
 						wa->lasttxhook[cc] = direction; 
 						daytona_phone_set_linefeed(pdx, dahdi_warp_get_controllor_index(wa->chans[jj]->chanpos), wa->lasttxhook[cc]);
+						//daytona_phone_set_linefeed(pdx, dahdi_warp_get_controllor_index(wa->chans[jj]->chanpos-1), wa->lasttxhook[cc]);
 					}
 				}
 			}
@@ -1847,7 +1865,7 @@ int __init dahdi_warp_scan_modules(PDEVICE_EXTENSION pdx)
 	unsigned fpga_rev = rev & 0xffff;
 	unsigned int module_a_type = 0;
 	unsigned int module_b_type = 0;
-	//unsigned int fxo_module_mask = 0;
+	unsigned int fxo_module_mask = 0;
 	unsigned int fxs_module_mask = 0;
 	
 	if ( fpga_rev >= FPGA_REVISION_2PART_READ ) {
@@ -1872,6 +1890,7 @@ int __init dahdi_warp_scan_modules(PDEVICE_EXTENSION pdx)
 	/* configure FXS modules first */
 
 #ifdef WARP_V2
+    //printk( "Adding internal port to mask %08x\n", MODULE_INTERNAL );
 	/* the internal FXS is always implicitly added (always there) */
 	fxs_module_mask |= MODULE_INTERNAL;
 #endif
@@ -1879,18 +1898,28 @@ int __init dahdi_warp_scan_modules(PDEVICE_EXTENSION pdx)
 
 	/* Start with module A then do module B */
 	if (module_a_type == MODULE_TYPE_FXS ) {
-		dahdi_warp_add_module(pdx, MODULE_TYPE_FXS, MODULE_PORT_A);
+		fxs_module_mask |= MODULE_PORT_A;
 
 	} else	if (module_a_type == MODULE_TYPE_FXO ) {
-		dahdi_warp_add_module(pdx, MODULE_TYPE_FXO, MODULE_PORT_A);
+		fxo_module_mask |= MODULE_PORT_A;
 	}
 
 
 	/* then, module B */
 	if (module_b_type == MODULE_TYPE_FXS) {
-		dahdi_warp_add_module(pdx, MODULE_TYPE_FXS, MODULE_PORT_B);
+		fxs_module_mask |= MODULE_PORT_B;
 	} else if ( module_b_type == MODULE_TYPE_FXO ) {
-		dahdi_warp_add_module(pdx, MODULE_TYPE_FXO, MODULE_PORT_B);
+		fxo_module_mask |= MODULE_PORT_B;
+	}
+
+	/* add any/all fxs modules */
+	if (fxs_module_mask) {
+		dahdi_warp_add_module(pdx, MODULE_TYPE_FXS, fxs_module_mask);
+	}
+
+	/* add any/all fxo modules */
+	if (fxo_module_mask) {
+		dahdi_warp_add_module(pdx, MODULE_TYPE_FXO, fxo_module_mask);
 	}
 	
 	/* return result (always success)*/
@@ -2092,10 +2121,12 @@ int __init dahdi_warp_init_module(void)
 	moda_fxs = (rev & 0x0f0000) == 0x020000;
 	modb_fxs = (rev & 0xf00000) == 0x200000;
 
+#ifndef WARP_V2
 	if (!moda_fxo && !modb_fxo && !moda_fxs && !modb_fxs) {
 		printk(KERN_WARNING "Analog Device not found\n");
 		return -ENODEV;
 	}
+#endif
 
 #ifdef CONFIG_POST
         if((moda_fxo) || (modb_fxo))
