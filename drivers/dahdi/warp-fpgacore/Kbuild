@@ -1,5 +1,5 @@
 # called from kernel build system: just declare what our modules are
-CFLAGS_MODULE += -I$(INCLUDE) -I$(src) -DCONFIG_WARP -DFPGA_6052 -DWARP_V2
+CFLAGS_MODULE += -I$(INCLUDE) -I$(src) -DCONFIG_WARP -DWARP_V2 
 
 obj-m := warp-fpgacore.o
 warp-fpgacore-objs := warp-fpga.o daytona.o slic.o fpga.o tacokmd.o pikadma.o fpgactrl.o

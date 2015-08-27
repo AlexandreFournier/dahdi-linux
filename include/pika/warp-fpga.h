@@ -73,11 +73,7 @@ struct fpga_ioctl_data_t
 #define	FPGA_IOCTL_INIT_TEST_SGL         _IO(FPGA_IOC_MAGIC,7)
 #define	FPGA_IOCTL_REINIT_FPGA           _IO(FPGA_IOC_MAGIC,8)
 
-#ifdef WARP_V2
-int pikadma_register_cb(int cardid, void (*cb)(int cardid));
-#else
 int pikadma_register_cb(int cardid, void (*cb)(int cardid, void *arg), void * arg);
-#endif
 int pikadma_unregister(int cardid);
 
 unsigned int fpga_read(void __iomem *fpga, int reg);

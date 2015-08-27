@@ -15,12 +15,8 @@ extern int debug;
 struct dma_inst {
 	struct list_head list;
 	int cardid;
-#ifdef WARP_V2
-	void (*cb)(int cardid);
-#else
 	void * arg;
 	void (*cb)(int cardid, void *arg);
-#endif
 };
 
 struct dsp_inst {
@@ -78,13 +74,8 @@ static irqreturn_t dma_isr(int irq, void *context)
 
 	if (iccr & FPGA_ICCR_DMA_DONE_MASK) {
 		// DMA Good
-#ifdef WARP_V2
-		list_for_each_entry(inst, &g_dma_ctx->list, list)
-			inst->cb(inst->cardid);
-#else
 		list_for_each_entry(inst, &g_dma_ctx->list, list)
 			inst->cb(inst->cardid, inst->arg);
-#endif
 	}
 
 	return IRQ_HANDLED;
@@ -101,11 +92,7 @@ static struct dma_inst *find_inst(struct warp_fpga *dma, int cardid)
 	return NULL;
 }
 
-#ifdef WARP_V2
-int pikadma_register_cb(int cardid, void (*cb)(int cardid))
-#else
 int pikadma_register_cb(int cardid, void (*cb)(int cardid,void * arg), void * arg)
-#endif
 {
 	struct warp_fpga *dma = g_dma_ctx;
 	struct dma_inst *inst;
@@ -129,10 +116,7 @@ int pikadma_register_cb(int cardid, void (*cb)(int cardid,void * arg), void * ar
 	fpga_write(dma->fpga, FPGA_IMR, imr & ~DMA_INTS);
 
 	inst->cardid = cardid;
-#ifdef WARP_V2
-#else
 	inst->arg = arg;
-#endif
 	inst->cb = cb;
 	list_add_tail(&inst->list, &dma->list);
 
@@ -278,6 +262,7 @@ void destroy_scatter_gather(struct warp_fpga *dma, int entries)
 }
 EXPORT_SYMBOL(destroy_scatter_gather);
 
+#ifdef FPGA_6052
 int dma_loop_back_test(void)
 {
 	struct warp_fpga *dma = g_dma_ctx;
@@ -600,6 +585,7 @@ error_cleanup:
 
 	return 1;
 } 
+#endif //FPGA_6052
 
 int dma_init_module(struct warp_fpga * dma)
 {

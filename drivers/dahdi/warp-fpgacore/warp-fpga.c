@@ -191,6 +191,7 @@ static int warp_fpga_probe(struct platform_device *pdev)
 	g_warp_fpga_dev = pdev;
 	warpfpga_active = 1;
 
+#ifndef WARP_V2
 	// Place DSP in Bypass mode if DSP count is zero
 	if (warp_fpga_dsp_count() == 0)
 	{
@@ -198,6 +199,7 @@ static int warp_fpga_probe(struct platform_device *pdev)
 		u32 val = fpga_read(chip->base, FPGA_DIAG) | 0x800;
 		fpga_write(chip->base, FPGA_DIAG, val);
 	}
+#endif
 
 	return ret;
 
