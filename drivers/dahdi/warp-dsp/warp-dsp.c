@@ -30,8 +30,7 @@
 #include <linux/kfifo.h>
 #include <linux/proc_fs.h>
 #include <linux/io.h>
-
-#undef WARP_V2
+#include <linux/seq_file.h>
 
 #include "3rdparty/GpakCust.h"
 #include "3rdparty/GpakApi.h"
@@ -43,7 +42,7 @@
 /* FPGA defines */
 #define FPGA_CONFIG		0x0000 /* Config */
 #define FPGA_PFT		0x000C /* Termincation on BRI */
-#define FPGA_RESET		0x0014 /* Reset control */
+//#define FPGA_RESET		0x0014 /* Reset control */
 #define FPGA_REV		0x001C /* FPGA load type and revision */
 #define FPGA_CIAR		0x0024 /* Codec Indirect Register */
 #define FPGA_ICCR		0x002c /* Interrupt Cause/Clear */
@@ -499,7 +498,8 @@ static ssize_t
 dsp_read(struct file *file, char *buf,
 	size_t count, loff_t *offset)
 {
-	unsigned minor = iminor(file->f_dentry->d_inode);
+	//unsigned minor = iminor(file->f_dentry->d_inode);
+	unsigned minor = iminor(file->f_inode);
 	struct dsp_fifo_event tmp_fifo_event;
 	unsigned int fifo_len;
 	int event_ready = 0;
@@ -1041,6 +1041,7 @@ warp_dsp_check_dsp_command_status(unsigned int dsp_id,struct warp_dsp_module *mo
 		}
 	}	
 }
+
 void warp_dsp_isr_worker(int dsp_id,void * arg)
 {
 	struct warp_dsp_module *module = (struct warp_dsp_module*)arg;
@@ -3575,9 +3576,11 @@ dahdi_warp_reset_packet_stats(int dsp_id, int channel_id)
 	return (ret);
 }
 
+#if 0
 static int
-dahdi_warp_write_dsp_params(struct file *filp, const char *buffer,
-			unsigned long count, void *data)
+//dahdi_warp_write_dsp_params(struct file *filp, const char *buffer,
+//			unsigned long count, void *data)
+dahdi_warp_write_dsp_params(void *data)
 {
 	struct warp_dsp_module *dspm = (struct warp_dsp_module*)data;
 	char stat_cmd[MAX_STAT_CMD_LEN+1];
@@ -3669,10 +3672,12 @@ dahdi_warp_write_dsp_params(struct file *filp, const char *buffer,
 
 	return count;
 }
+#endif
 
 static int
-dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
-			  int count, int *eof, void *data)
+//dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
+//			  int count, int *eof, void *data)
+dahdi_warp_read_dsp_params(struct seq_file *sfile, void *data)
 {
 	struct warp_dsp_module *dspm = (struct warp_dsp_module*)data;
 	unsigned short channel_id;
@@ -3680,7 +3685,7 @@ dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
 	int len = 0;
 	int ret;
 
-	*eof = 1;
+	//*eof = 1;
 
 	dahdi_warp_log(DSP_FUNC_LOG, "%s() called\n",
 		__FUNCTION__);
@@ -3694,11 +3699,11 @@ dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
 	for (dsp_id = 0; dsp_id < gCurrentMaxDspCount; dsp_id++) {
 
 		if (!dahdi_warp_get_dsp_ready(dsp_id)) {
-			len += sprintf (page + len, "Dsp (%d) NOT Ready (yet)\n", dsp_id);
+			len += seq_printf (sfile, "Dsp (%d) NOT Ready (yet)\n", dsp_id);
 			break;
 		}
 
-		len += sprintf(page + len, "%d %d %d %lu.%lu %lu.%lu 0x%08x %lu %lu %lu %lu\n",
+		len += seq_printf(sfile, "%d %d %d %lu.%lu %lu.%lu 0x%08x %lu %lu %lu %lu\n",
 				dsp_id,
 				atomic_read(&dspm->dsp[dsp_id].tcoder_count),
 				atomic_read(&dspm->dsp[dsp_id].ecan_count),
@@ -3713,7 +3718,7 @@ dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
 				dspm->dsp[dsp_id].irq_count
 				);
 
-		len += sprintf(page + len, "%d %d %d %d %d %d %d %d %d %d\n",
+		len += seq_printf(sfile, "%d %d %d %d %d %d %d %d %d %d\n",
 				dsp_id,
 				dspm->dsp[dsp_id].port1.status,
 				dspm->dsp[dsp_id].port1.rxints,
@@ -3726,7 +3731,7 @@ dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
 				dspm->dsp[dsp_id].port1.frameerrs,
 				dspm->dsp[dsp_id].port1.restarts);
 
-		len += sprintf(page + len, "%d %d %d %d %d %d %d %d %d %d\n",
+		len += seq_printf(sfile, "%d %d %d %d %d %d %d %d %d %d\n",
 				dsp_id,
 				dspm->dsp[dsp_id].port2.status,
 				dspm->dsp[dsp_id].port2.rxints,
@@ -3743,13 +3748,13 @@ dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
 	for (dsp_id = 0; dsp_id < gCurrentMaxDspCount; dsp_id++) {
 
 		if (!dahdi_warp_get_dsp_ready(dsp_id)) {
-			len += sprintf (page + len, "Dsp (%d) NOT Ready (yet)\n", dsp_id);
+			len += seq_printf (sfile, "Dsp (%d) NOT Ready (yet)\n", dsp_id);
 			break;
 		}
 
 		for (channel_id = 0; channel_id < MAX_CHANNEL_COUNT; channel_id++) {
 			if ((dspm->chans[dsp_id][channel_id].type == TRANSCODER) && (dspm->chans[dsp_id][channel_id].status == BUSY)) {
-				len += sprintf(page + len, "%d %d %d %d %d %d %d %d %d %d %d %d %d\n", 
+				len += seq_printf(sfile, "%d %d %d %d %d %d %d %d %d %d %d %d %d\n", 
 						channel_id,
 						dspm->chans[dsp_id][channel_id].paired_channel,
 						dspm->chans[dsp_id][channel_id].stats.pkts_to_dsp,
@@ -3770,6 +3775,19 @@ dahdi_warp_read_dsp_params(char *page, char **start, off_t off,
 	return (len);
 }
 
+static int dahdi_warp_proc_open(struct inode *inode, struct file *file)
+{
+        return single_open(file, dahdi_warp_read_dsp_params, PDE_DATA(file_inode(file)));
+}
+
+static const struct file_operations dahdi_warp_proc_fops = {
+        .owner          = THIS_MODULE,
+        .open           = dahdi_warp_proc_open,
+        .read           = seq_read,
+        .llseek         = seq_lseek,
+        .release        = single_release,
+};
+
 static int
 dahdi_warp_proc_init(void *data)
 {
@@ -3778,13 +3796,16 @@ dahdi_warp_proc_init(void *data)
 	dahdi_warp_log(DSP_FUNC_LOG, "%s() called\n",
 		__FUNCTION__);
 
-	entry = create_proc_entry(DSP_PROC_ENTRY, 0, NULL);
-	if (!entry)
-		return -ENOMEM;
+	//entry = create_proc_entry(DSP_PROC_ENTRY, 0, NULL);
+	//if (!entry)
+	//	return -ENOMEM;
+    if (!proc_create_data("DSP_PROC_ENTRY", 0, NULL, &dahdi_warp_proc_fops, data))
+                return -ENOMEM;
 
-	entry->read_proc = dahdi_warp_read_dsp_params;
-	entry->write_proc = dahdi_warp_write_dsp_params;
-	entry->data = data; 
+
+	//entry->read_proc = dahdi_warp_read_dsp_params;
+	//entry->write_proc = dahdi_warp_write_dsp_params;
+	//entry->data = data; 
 
 	return 0;
 }
@@ -4077,70 +4098,21 @@ static void dsp_device_release(struct device *dev) {}
 static int 
 __init dahdi_warp_dsp_init(void)
 {
-#ifdef WARP_V2
-	struct device_node *np = NULL;
-	struct device_node *child = NULL;
-#else 
 	// WARP_V3
 	struct warp_fpga * dma = NULL;
 	u32 config_reg = 0;
-#endif
 	int event_fifo_size = EVENT_FIFO_MAX_MSGS * sizeof(struct dsp_fifo_event);
 	int chr_region_alloc = 0;
 	int sysfs_class_alloc = 0;
 	int cdev_alloc = 0;
 	int err = -EINVAL;
 	int ii, jj,dsp_id;
-#ifdef WARP_V2
-	unsigned board_id0 = 0;
-	unsigned board_id1 = 0;
-	unsigned board_id2 = 0;
-	unsigned value;
 
-	np = of_find_compatible_node(NULL, NULL, "gpio-boardid");
-	if (!np) {
-		printk(KERN_ERR "%s() : Unable to find gpio-boardid\n",
-			__FUNCTION__);
-		goto error_cleanup;
-	}
-
-	for_each_child_of_node(np, child) {
-		if (strcmp(child->name, "board_id0") == 0) {
-			board_id0 = of_get_gpio(child, 0);	
-		} else if (strcmp(child->name, "board_id1") == 0) {
-			board_id1 = of_get_gpio(child, 0);
-		} else if (strcmp(child->name, "board_id2") == 0) {
-			board_id2 = of_get_gpio(child, 0);
-		}
-	}
-	of_node_put(np);
-
-	value = 0;
-	if (gpio_get_value(board_id0)) {
-		value |= 0x0004;
-	} 
-
-	if (gpio_get_value(board_id1)) {
-		value |= 0x0002;
-	} 
-
-	if (gpio_get_value(board_id2)) {
-		value |= 0x0001;
-	} 
-
-	if ((value == PIK_98_00910_NO_OBFXS) || (value == PIK_98_00910)) {
-		printk(KERN_ERR "DSP not Detected (boardid=0x%04x). Driver not loading.\n", value);
-		return (-ENODEV);
-	} else {
-		printk(KERN_INFO "DSP Detected (boardid=0x%04x). Driver loading.\n", value);
-	}
-#else
 	if ( warp_fpga_isactive() == 0 )
 	{
 		printk(KERN_ERR "FPGA is not active\n");
 		return -ENODEV;
 	}
-#endif
 
 
 	dsp_module = kzalloc(sizeof(struct warp_dsp_module), GFP_KERNEL);
@@ -4151,50 +4123,7 @@ __init dahdi_warp_dsp_init(void)
 	}
 
 	spin_lock_init(&dsp_module->list_spinlock);
-#ifdef WARP_V2
-	np = of_find_compatible_node(NULL, NULL, "pika,fpga");
-        if (!np) {
-                printk(KERN_ERR "%s() : Unable to find fpga\n",
-			__FUNCTION__);
-                goto error_cleanup;
-        }
 
-	dsp_module->fpga = of_iomap(np, 0);
-	if (!dsp_module->fpga) {
-		printk(KERN_ERR "%s() : Unable to get FPGA address\n",
-			__FUNCTION__);
-		err = -ENOMEM;
-		goto error_cleanup;
-	}
-
-	of_node_put(np);
-	np = NULL;
-
-	np = of_find_compatible_node(NULL, NULL, "pika,dsp");
-	if (!np) {
-		printk(KERN_ERR "%s() : Unable to find dsp\n",
-			__FUNCTION__);
-		goto error_cleanup;
-	}
-
-	dsp_module->dsp_host_port = of_iomap(np, 0);
-	if (!dsp_module->dsp_host_port) {
-		printk(KERN_ERR "%s() : Unable to get DSP address\n",
-			__FUNCTION__);
-		err = -ENOMEM;
-		goto error_cleanup;
-	}
-
-	dsp_module->irq = irq_of_parse_and_map(np, 0);
-	if (dsp_module->irq == NO_IRQ) {
-		printk(KERN_ERR "%s() : irq_of_parse_and_map failure\n",
-			__FUNCTION__);
-		goto error_cleanup;
-	}
-
-	of_node_put(np);
-	np = NULL;
-#else // WARP_V3
 	dma = warp_fpga_getdevice();
 
 	dsp_module->fpga = dma->base;
@@ -4203,8 +4132,10 @@ __init dahdi_warp_dsp_init(void)
 	dsp_module->dsp_host_port = dma->base ;
 	dsp_module->irq = dma->irq;
 
+#ifndef WARP_V2
 	/* Detect number of DSP installed */
 	config_reg = fpga_read(dsp_module->fpga, FPGA_CONFIG_REG_OFFSET) & 0x3000000;
+
 	config_reg >>= 24;
 	if (config_reg > 0 )
 	{	
@@ -4233,7 +4164,9 @@ __init dahdi_warp_dsp_init(void)
 	}
 #endif
 
+    printk ( KERN_ERR "==> DSP Count %i\n", gCurrentMaxDspCount );
 	for (dsp_id = 0; dsp_id < gCurrentMaxDspCount; dsp_id++) {
+        printk (KERN_ERR "DSP %i of  %i\n", dsp_id, gCurrentMaxDspCount );
 
 		for (ii = 0; ii < MAX_CHANNEL_COUNT; ii++) {
 			clear_bit(CHAN_READY, &dsp_module->chans[dsp_id][ii].flags);
@@ -4329,25 +4262,12 @@ __init dahdi_warp_dsp_init(void)
 		goto error_cleanup;
 	}
 
-//#ifdef WARP_V2
-
-	err = request_irq(dsp_module->irq, warp_dsp_isr, IRQF_SHARED,
-				"warpdsp", dsp_module);
-	if (err) {
-		printk(KERN_ERR "%s() : Unable to request IRQ\n",
-			__FUNCTION__);
-		goto error_cleanup;
-	}
-
-/*
-#else // WARP_V3
 	err = warp_fpga_set_dsp_callback(warp_dsp_isr, dsp_module);
 	if (err) {
 		printk(KERN_ERR "%s() : Unable to request IRQ\n",
 			__FUNCTION__);
 		goto error_cleanup;
 	}
-#endif */
 
 	printk(KERN_INFO "WARP DSP initialization complete.\n");
 	return 0;
