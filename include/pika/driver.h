@@ -87,7 +87,11 @@
 
 #ifdef CONFIG_WARP
 /* These are the bits we must not touch */
+#ifdef FPGA_6052
 #define IMR_MASK 0x003C7000
+#else
+#define IMR_MASK 0x203EF000
+#endif
 #else
 #define IMR_MASK 0
 #endif
